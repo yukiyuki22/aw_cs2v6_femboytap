@@ -856,10 +856,6 @@ end)
 
 local vtab = M:Tab("Visuals")
 
-local sublocal = vtab:Sub("Local")
-sublocal:Row()
-local localSection = sublocal:Section("Local player")
-
 local subsound = vtab:Sub("Sounds")
 subsound:Row()
 local hsSec = subsound:Section("Hit sound")
