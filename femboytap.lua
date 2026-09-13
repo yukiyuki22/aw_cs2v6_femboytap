@@ -6,10 +6,6 @@ local ffi = rawget(_G, "ffi")
 local function r_ptr(a) return tonumber(ffi.cast("uint64_t*", a)[0]) end
 local function valid(p) return p ~= nil and p > 0x10000 and p < 0x7FFFFFFFFFFF end
 
-local SIG = {
-    vm = "E8 ?? ?? ?? ?? 48 8B CB E8 ?? ?? ?? ?? 84 C0 74 11 F3 0F 10 45 B0",
-}
-
 local function fetch(url, cacheFile)
     local src
     local bust = url .. "?nocache=" .. tostring({}):gsub("%W", "")
@@ -81,10 +77,8 @@ function C.setOpt(key, value) options[key] = value; saveOptions() end
 
 local floor = math.floor
 
-local VM = {}
 local HS = {}
 
-local cbVm, vmX, vmY, vmZ
 local hsOn, hsCmb, hsCmbWd, hsVol
 local ksOn, ksCmb, ksCmbWd, ksVol
 local hlOn, hlMiss, hlHit, hlHurt, hlKill
@@ -93,117 +87,6 @@ local rgOn, rgCmb, rgCmbWd, rgPen, rgMin
 local ncOn, ncMode, ncSrc, ncText, ncSpeed
 local vrOn, vrMode
 local SND_NAMES, SND_PATHS
-
-do
-    local page, match, origRel, ok = nil, nil, nil, false
-
-    local function r_i32(a) return ffi.cast("int32_t*",  a)[0] end
-    local function w_u8 (a, v) ffi.cast("uint8_t*", a)[0] = v end
-    local function w_i32(a, v) ffi.cast("int32_t*", a)[0] = v end
-    local function w_f32(a, v) ffi.cast("float*",   a)[0] = v end
-
-    local function le64(v)
-        local t = {}
-        for _ = 1, 8 do t[#t + 1] = v % 256; v = math.floor(v / 256) end
-        return t
-    end
-
-    local function alloc_near(target, size)
-        local gran = 0x10000
-        local base = target - (target % gran)
-        for i = 1, 0x8000 do
-            local lo, hi = base - i * gran, base + i * gran
-            if lo > 0x10000 then
-                local p = ffi.C.VirtualAlloc(ffi.cast("void*", lo), size, 0x3000, 0x40)
-                if p ~= nil then return p end
-            end
-            local p2 = ffi.C.VirtualAlloc(ffi.cast("void*", hi), size, 0x3000, 0x40)
-            if p2 ~= nil then return p2 end
-        end
-        return nil
-    end
-
-    local function install()
-        if type(ffi) ~= "table" then print("[femboytap] VM: no ffi"); return false end
-        pcall(function() ffi.cdef [[
-            void* VirtualAlloc(void*, size_t, uint32_t, uint32_t);
-            int   VirtualProtect(void*, size_t, uint32_t, uint32_t*);
-            void* GetCurrentProcess(void);
-            int   FlushInstructionCache(void*, void*, size_t);
-        ]] end)
-
-        local a = mem.FindPattern("client.dll", SIG.vm)
-        if not a or a == 0 then print("[femboytap] VM: sig not found"); return false end
-        match = a
-        local orig = a + 5 + r_i32(a + 1)
-
-        local p = alloc_near(orig, 0x1000)
-        if p == nil then print("[femboytap] VM: alloc failed"); return false end
-        page = tonumber(ffi.cast("uintptr_t", p))
-        local code = page + 16
-
-        local b = { 0x53, 0x56, 0x48,0x83,0xEC,0x28, 0x48,0x89,0xD6, 0x48,0xB8 }
-        for _, v in ipairs(le64(orig)) do b[#b + 1] = v end
-        for _, v in ipairs({ 0xFF,0xD0, 0x48,0xBB }) do b[#b + 1] = v end
-        for _, v in ipairs(le64(page)) do b[#b + 1] = v end
-        for _, v in ipairs({
-            0x8B,0x0B, 0x85,0xC9, 0x74,0x2B,
-            0xF3,0x0F,0x10,0x4B,0x04, 0xF3,0x0F,0x58,0x0E, 0xF3,0x0F,0x11,0x0E,
-            0xF3,0x0F,0x10,0x4B,0x08, 0xF3,0x0F,0x58,0x4E,0x04, 0xF3,0x0F,0x11,0x4E,0x04,
-            0xF3,0x0F,0x10,0x4B,0x0C, 0xF3,0x0F,0x58,0x4E,0x08, 0xF3,0x0F,0x11,0x4E,0x08,
-            0x48,0x83,0xC4,0x28, 0x5E, 0x5B, 0xC3,
-        }) do b[#b + 1] = v end
-        for i = 0, #b - 1 do w_u8(code + i, b[i + 1]) end
-        w_i32(page, 0); w_f32(page + 4, 0); w_f32(page + 8, 0); w_f32(page + 12, 0)
-
-        local rel = code - (match + 5)
-        if rel < -2147483648 or rel > 2147483647 then print("[femboytap] VM: rel32 overflow"); return false end
-        origRel = r_i32(match + 1)
-        local old = ffi.new("uint32_t[1]")
-        ffi.C.VirtualProtect(ffi.cast("void*", match), 5, 0x40, old)
-        w_i32(match + 1, rel)
-        ffi.C.VirtualProtect(ffi.cast("void*", match), 5, old[0], old)
-        pcall(function() ffi.C.FlushInstructionCache(ffi.C.GetCurrentProcess(), ffi.cast("void*", match), 5) end)
-        print("[femboytap] VM: installed")
-        return true
-    end
-
-    -- Disabled on load: code patch crashes after CS2 update (execute AV on unmapped RIP)
-    -- pcall(function() ok = install() end)
-    print("[femboytap] VM: auto-install disabled (safe mode)")
-
-    function VM.set(on, x, y, z)
-        if not ok or not page then return end
-        w_i32(page, on and 1 or 0)
-        w_f32(page + 4, x or 0)
-        w_f32(page + 8, y or 0)
-        w_f32(page + 12, z or 0)
-    end
-
-    function VM.uninstall()
-        if not (ok and match and origRel) then return end
-        pcall(function()
-            local old = ffi.new("uint32_t[1]")
-            ffi.C.VirtualProtect(ffi.cast("void*", match), 5, 0x40, old)
-            w_i32(match + 1, origRel)
-            ffi.C.VirtualProtect(ffi.cast("void*", match), 5, old[0], old)
-        end)
-    end
-end
-pcall(function() callbacks.Register("Unload", function() pcall(VM.uninstall) end) end)
-
-local lastVm = nil
-local function syncVm()
-    local on = cbVm:Get()
-    local x, y, z = vmX:Get(), vmY:Get(), vmZ:Get()
-    VM.set(on, x, y, z)
-    local s = (on and "1" or "0") .. ":" .. x .. ":" .. y .. ":" .. z
-    if s ~= lastVm then
-        lastVm = s
-        C.setOpt("vm_on", on)
-        C.setOpt("vm_x", x); C.setOpt("vm_y", y); C.setOpt("vm_z", z)
-    end
-end
 
 do
     local f = ffi
@@ -976,10 +859,6 @@ local vtab = M:Tab("Visuals")
 local sublocal = vtab:Sub("Local")
 sublocal:Row()
 local localSection = sublocal:Section("Local player")
-cbVm = localSection:Checkbox("Viewmodel override", false)
-vmX  = localSection:Slider("Offset X", 0, -30, 30, 0.1, "%.1f")
-vmY  = localSection:Slider("Offset Y", 0, -30, 30, 0.1, "%.1f")
-vmZ  = localSection:Slider("Offset Z", 0, -30, 30, 0.1, "%.1f")
 
 local subsound = vtab:Sub("Sounds")
 subsound:Row()
@@ -1374,11 +1253,6 @@ do
     if next(s) then M:HitlogSet(s) end
 end
 
-cbVm:Set(C.getOpt("vm_on") and true or false)
-vmX:Set(tonumber(C.getOpt("vm_x")) or 0)
-vmY:Set(tonumber(C.getOpt("vm_y")) or 0)
-vmZ:Set(tonumber(C.getOpt("vm_z")) or 0)
-
 local function getBool(k, d)
     local v = C.getOpt(k); if v == nil then return d end
     return v and true or false
@@ -1436,7 +1310,6 @@ vrOn:Set(getBool("vr_on", false))
 do local p = tonumber(C.getOpt("vr_mode")); if p and p >= 1 and p <= 3 then vrMode:Set(p) end end
 
 M:OnFrame(function()
-    pcall(syncVm)
     pcall(HS.missTick)
     pcall(HS.sync)
     pcall(hlSync)
