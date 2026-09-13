@@ -920,10 +920,9 @@ wmElems = wmSec:MultiCombo("Elements",
     { "Cheat name", "Lua name", "Username", "Nickname", "fps", "ping" }, { 2, 4, 5, 6 })
 wmPos   = wmSec:Combo("Position", { "Top left", "Top right", "Bottom left", "Bottom right" }, 2)
 
-local spamMode, spamText, spamMulti, spamDelay, spamChatType
+local spamMode, spamText, spamMulti, spamDelay, spamChatType, spamPause
 local spamLastTime = 0
 local spamMultiIndex = 1
-local spamPaused = false
 
 local function spamChat(message)
     if not message or message == "" or message:match("^%s*$") then return end
@@ -946,7 +945,7 @@ end
 
 local function spamSync()
     local mode = spamMode:Get()
-    if mode == 1 or spamPaused then return end
+    if mode == 1 or spamPause:Get() then return end
 
     local currentTime = common.Time()
     if (currentTime - spamLastTime) < spamDelay:Get() then return end
@@ -975,7 +974,7 @@ spamText = spamSec:Input("Single msg", "", "message")
 spamMulti = spamSec:Input("Paste the lines here", "", "one message per line")
 spamDelay = spamSec:Slider("Delay", 0.1, 0.05, 5.0, 0.05, "%.2f")
 spamChatType = spamSec:Combo("Type of chat", { "All Chat", "Team Chat" }, 1)
-spamSec:Button("Pause / resume", function() spamPaused = not spamPaused end)
+spamPause = spamSec:Checkbox("Paused", false)
 
 local ncClock = (function()
     for _, fn in ipairs({ function() return globals.RealTime() end,

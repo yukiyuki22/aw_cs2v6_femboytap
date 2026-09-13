@@ -293,7 +293,7 @@ local function clipGet()
         end
         ffi.C.CloseClipboard()
     end)
-    if out then out = out:gsub("[\r\n\t]", "") end
+    if out then out = out:gsub("\r\n", "\n"):gsub("\r", "") end
     return out
 end
 
