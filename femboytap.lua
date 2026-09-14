@@ -986,6 +986,19 @@ local bbGrid = bbSec:Checkbox("3D Grid", true)
 local bbGridColor = bbSec:ColorPicker("Grid color", { 0, 180, 255, 255 })
 local bbHudX = bbSec:Slider("HUD X", 16, 0, 3840, 1, "%.0f")
 local bbHudY = bbSec:Slider("HUD Y", 900, 0, 2160, 1, "%.0f")
+local bbBind = bbSec:Input("Toggle key", "", "F or mouse4")
+
+local BB_KEY_CODES = { SPACE = 0x20, MOUSE1 = 0x01, MOUSE2 = 0x02, MOUSE3 = 0x04, MOUSE4 = 0x05, MOUSE5 = 0x06 }
+for i = 0, 9 do BB_KEY_CODES[tostring(i)] = 0x30 + i end
+for i = 0, 25 do BB_KEY_CODES[string.char(65 + i)] = 0x41 + i end
+local function blockBotKeyTick()
+    local bind = tostring(bbBind:Get() or ""):upper():gsub("%s+", "")
+    local code = BB_KEY_CODES[bind]
+    if not code then return end
+    local pressed = false
+    pcall(function() pressed = input.IsButtonPressed(code) and true or false end)
+    if pressed then bbOn:Set(not bbOn:Get()) end
+end
 
 local blockBot
 pcall(function()
@@ -1413,7 +1426,11 @@ do local p = tonumber(C.getOpt("vr_mode")); if p and p >= 1 and p <= 3 then vrMo
 
 M:OnFrame(function()
     pcall(spamSync)
-    if blockBot then pcall(blockBot.Draw) end
+    pcall(blockBotKeyTick)
+    if blockBot then
+        pcall(blockBot.Draw)
+        if M._font then pcall(function() draw.SetFont(M._font) end) end
+    end
     pcall(HS.missTick)
     pcall(HS.sync)
     pcall(hlSync)

@@ -147,6 +147,9 @@ local function fontInitCoro()
     end
 
     initFonts()
+    M._font = FONT
+    M._fontBold = FONT_B
+    M._fontLogo = FONT_LOGO
 end
 
 local function setcol(c) draw.Color(c[1], c[2], c[3], rnd((c[4] or 255) * ALPHA)) end
