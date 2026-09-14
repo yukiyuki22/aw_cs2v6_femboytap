@@ -991,13 +991,15 @@ local bbBind = bbSec:Input("Toggle key", "", "F or mouse4")
 local BB_KEY_CODES = { SPACE = 0x20, MOUSE1 = 0x01, MOUSE2 = 0x02, MOUSE3 = 0x04, MOUSE4 = 0x05, MOUSE5 = 0x06 }
 for i = 0, 9 do BB_KEY_CODES[tostring(i)] = 0x30 + i end
 for i = 0, 25 do BB_KEY_CODES[string.char(65 + i)] = 0x41 + i end
+local bbKeyDown = false
 local function blockBotKeyTick()
     local bind = tostring(bbBind:Get() or ""):upper():gsub("%s+", "")
     local code = BB_KEY_CODES[bind]
-    if not code then return end
+    if not code then bbKeyDown = false; return end
     local pressed = false
     pcall(function() pressed = input.IsButtonPressed(code) and true or false end)
-    if pressed then bbOn:Set(not bbOn:Get()) end
+    if pressed and not bbKeyDown then bbOn:Set(not bbOn:Get()) end
+    bbKeyDown = pressed
 end
 
 local blockBot
@@ -1031,9 +1033,13 @@ pcall(function()
     blockBot = result
 end)
 if type(blockBot) == "table" then
+    local function blockBotMove(cmd)
+        pcall(blockBotKeyTick)
+        return blockBot.Move(cmd)
+    end
     local ok = pcall(function()
-        callbacks.Register("PreMove", "FemboyTap_BlockBot_PreMove", blockBot.Move)
-        callbacks.Register("CreateMove", "FemboyTap_BlockBot_CreateMove", blockBot.Move)
+        callbacks.Register("PreMove", "FemboyTap_BlockBot_PreMove", blockBotMove)
+        callbacks.Register("CreateMove", "FemboyTap_BlockBot_CreateMove", blockBotMove)
         callbacks.Register("Unload", "FemboyTap_BlockBot_Unload", blockBot.Unload)
     end)
     if not ok then print("[femboytap] blockbot load error: callback registration failed") end
@@ -1426,7 +1432,6 @@ do local p = tonumber(C.getOpt("vr_mode")); if p and p >= 1 and p <= 3 then vrMo
 
 M:OnFrame(function()
     pcall(spamSync)
-    pcall(blockBotKeyTick)
     if blockBot then
         pcall(blockBot.Draw)
         if M._font then pcall(function() draw.SetFont(M._font) end) end
