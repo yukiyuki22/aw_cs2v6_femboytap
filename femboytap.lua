@@ -945,11 +945,6 @@ end
 
 local function spamSync()
     local mode = spamMode:Get()
-    spamText:SetInvisible(mode ~= 2)
-    spamMulti:SetInvisible(mode ~= 3)
-    spamDelay:SetInvisible(mode == 1)
-    spamChatType:SetInvisible(mode == 1)
-    spamPause:SetInvisible(mode == 1)
     if mode == 1 or spamPause:Get() then return end
 
     local currentTime = common.Time()

@@ -38,7 +38,6 @@ local T = {
 
 local WH = { check = 28, button = 36, slider = 36, combo = 52, multicombo = 52, input = 52, color = 28 }
 local function wheight(wd)
-    if wd.invisible then return 0 end
     if wd.kind == "listbox" then
         return ((wd.label and wd.label ~= "") and 18 or 0) + wd.h + 6
     end
@@ -474,7 +473,6 @@ local function handle(w)
     return {
         Get = function() return w.value end,
         Set = function(_, v) w.value = v end,
-        SetInvisible = function(_, v) w.invisible = v and true or false end,
     }
 end
 
@@ -600,25 +598,23 @@ function Section:render(x, y, w)
     local ix = x + 14
     local iw = w - 28
     for _, wd in ipairs(self.ws) do
-        if not wd.invisible then
-            local wh
-            if wd.kind == "listbox" and wd.fill then
-                local labelH = (wd.label and wd.label ~= "") and 18 or 0
-                local remain = (y + h - 12) - (iy + labelH)
-                wd._fillH = mmax(wd.h or 120, remain)
-                wh = labelH + wd._fillH + 6
-            else
-                wh = wheight(wd)
-            end
-            local visible = true
-            if clipBottom and iy >= clipBottom then visible = false end
-            if clipTop and (iy + wh) <= clipTop then visible = false end
-            if visible then
-                self:_widget(wd, ix, iy, iw)
-            end
-            iy = iy + wh
-            if clipBottom and iy >= clipBottom then break end
+        local wh
+        if wd.kind == "listbox" and wd.fill then
+            local labelH = (wd.label and wd.label ~= "") and 18 or 0
+            local remain = (y + h - 12) - (iy + labelH)
+            wd._fillH = mmax(wd.h or 120, remain)
+            wh = labelH + wd._fillH + 6
+        else
+            wh = wheight(wd)
         end
+        local visible = true
+        if clipBottom and iy >= clipBottom then visible = false end
+        if clipTop and (iy + wh) <= clipTop then visible = false end
+        if visible then
+            self:_widget(wd, ix, iy, iw)
+        end
+        iy = iy + wh
+        if clipBottom and iy >= clipBottom then break end
     end
     return h
 end
