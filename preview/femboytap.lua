@@ -1,4 +1,4 @@
-local BASE        = rawget(_G, "FEMBOY_BASE") or "https://raw.githubusercontent.com/cachorropacoca/aw_cs2v6_femboytap/main/preview/"
+local BASE        = rawget(_G, "FEMBOY_BASE") or "https://raw.githubusercontent.com/cachorropacoca/aw_cs2v6_femboytap/main/"
 local GUILIB_URL  = BASE .. "femboytap_guilib.lua"
 
 local ffi = rawget(_G, "ffi")
@@ -975,6 +975,34 @@ spamMulti = spamSec:Input("Paste the lines here", "", "one message per line")
 spamDelay = spamSec:Slider("Delay", 0.1, 0.05, 5.0, 0.05, "%.2f")
 spamChatType = spamSec:Combo("Type of chat", { "All Chat", "Team Chat" }, 1)
 spamPause = spamSec:Checkbox("Paused", false)
+
+local bbOn, bbDot, bbDotColor, bbGrid, bbGridColor, bbHudX, bbHudY
+local blockSub = ttab:Sub("Block Bot")
+blockSub:Row()
+local blockSec = blockSub:Section("Block bot")
+bbOn = blockSec:Checkbox("Enable", false); bbDot = blockSec:Checkbox("Target Dot", true); bbDotColor = blockSec:ColorPicker("Dot color", { 255, 80, 30 }); bbGrid = blockSec:Checkbox("3D Grid", true); bbGridColor = blockSec:ColorPicker("Grid color", { 0, 180, 255 }); bbHudX = blockSec:Slider("HUD X", 16, 0, 3840, 1, "%.0f"); bbHudY = blockSec:Slider("HUD Y", 900, 0, 2160, 1, "%.0f")
+local blockApi
+pcall(function()
+    local f = file.Open("blockbot.lua", "r")
+    if not f then return end
+    local source = f:Read(); f:Close()
+    local chunk, err = loadstring(source, "=blockbot.lua")
+    if not chunk then print("[femboytap] blockbot compile error: " .. tostring(err)); return end
+    local oldEmbed, oldUi = rawget(_G, "FEMBOY_BLOCKBOT_EMBED"), rawget(_G, "FEMBOY_BLOCKBOT_UI")
+    _G.FEMBOY_BLOCKBOT_EMBED, _G.FEMBOY_BLOCKBOT_UI = true, {
+        on = bbOn, dot = bbDot, dotColor = bbDotColor, grid = bbGrid,
+        gridColor = bbGridColor, hudX = bbHudX, hudY = bbHudY,
+    }
+    local ok, result = pcall(chunk)
+    _G.FEMBOY_BLOCKBOT_EMBED, _G.FEMBOY_BLOCKBOT_UI = oldEmbed, oldUi
+    if ok and type(result) == "table" then blockApi = result else print("[femboytap] blockbot load error: " .. tostring(result)) end
+end)
+if blockApi then
+    callbacks.Register("PreMove", "FemboyTap_BlockBot_PreMove", blockApi.Move)
+    callbacks.Register("CreateMove", "FemboyTap_BlockBot_CreateMove", blockApi.Move)
+    callbacks.Register("Draw", "FemboyTap_BlockBot_Draw", blockApi.Draw)
+    callbacks.Register("Unload", "FemboyTap_BlockBot_Unload", blockApi.Unload)
+end
 
 local ncClock = (function()
     for _, fn in ipairs({ function() return globals.RealTime() end,
