@@ -842,7 +842,9 @@ local function on_draw()
 end
 
 pickFonts() -- synchronous fallback font, immediately usable
-installFonts() -- kicks off async http.Get downloads; upgrades fonts whenever each lands
+if not embedded then
+    installFonts() -- standalone mode may upgrade fonts asynchronously
+end
 _getMouse = resolveMouse()
 _clock    = resolveClock()
 resolveMenuRef()
