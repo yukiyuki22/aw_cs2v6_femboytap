@@ -1,4 +1,4 @@
-local BASE        = rawget(_G, "FEMBOY_BASE") or "https://raw.githubusercontent.com/cachorropacoca/aw_cs2v6_femboytap/main/"
+local BASE        = rawget(_G, "FEMBOY_BASE") or "https://raw.githubusercontent.com/cachorropacoca/aw_cs2v6_femboytap/main/preview/"
 local GUILIB_URL  = BASE .. "femboytap_guilib.lua"
 
 local ffi = rawget(_G, "ffi")
@@ -976,32 +976,39 @@ spamDelay = spamSec:Slider("Delay", 0.1, 0.05, 5.0, 0.05, "%.2f")
 spamChatType = spamSec:Combo("Type of chat", { "All Chat", "Team Chat" }, 1)
 spamPause = spamSec:Checkbox("Paused", false)
 
-local bbOn, bbDot, bbDotColor, bbGrid, bbGridColor, bbHudX, bbHudY
-local blockSub = ttab:Sub("Block Bot")
-blockSub:Row()
-local blockSec = blockSub:Section("Block bot")
-bbOn = blockSec:Checkbox("Enable", false); bbDot = blockSec:Checkbox("Target Dot", true); bbDotColor = blockSec:ColorPicker("Dot color", { 255, 80, 30 }); bbGrid = blockSec:Checkbox("3D Grid", true); bbGridColor = blockSec:ColorPicker("Grid color", { 0, 180, 255 }); bbHudX = blockSec:Slider("HUD X", 16, 0, 3840, 1, "%.0f"); bbHudY = blockSec:Slider("HUD Y", 900, 0, 2160, 1, "%.0f")
-local blockApi
+local bbSub = ttab:Sub("Block Bot")
+bbSub:Row()
+local bbSec = bbSub:Section("Block bot")
+local bbOn = bbSec:Checkbox("Enable", false)
+local bbDot = bbSec:Checkbox("Target Dot", true)
+local bbDotColor = bbSec:ColorPicker("Dot color", { 255, 80, 30, 255 })
+local bbGrid = bbSec:Checkbox("3D Grid", true)
+local bbGridColor = bbSec:ColorPicker("Grid color", { 0, 180, 255, 255 })
+local bbHudX = bbSec:Slider("HUD X", 16, 0, 3840, 1, "%.0f")
+local bbHudY = bbSec:Slider("HUD Y", 900, 0, 2160, 1, "%.0f")
+
+local blockBot
 pcall(function()
     local f = file.Open("blockbot.lua", "r")
     if not f then return end
-    local source = f:Read(); f:Close()
-    local chunk, err = loadstring(source, "=blockbot.lua")
+    local src = f:Read(); f:Close()
+    local chunk, err = loadstring(src, "=blockbot.lua")
     if not chunk then print("[femboytap] blockbot compile error: " .. tostring(err)); return end
-    local oldEmbed, oldUi = rawget(_G, "FEMBOY_BLOCKBOT_EMBED"), rawget(_G, "FEMBOY_BLOCKBOT_UI")
-    _G.FEMBOY_BLOCKBOT_EMBED, _G.FEMBOY_BLOCKBOT_UI = true, {
-        on = bbOn, dot = bbDot, dotColor = bbDotColor, grid = bbGrid,
-        gridColor = bbGridColor, hudX = bbHudX, hudY = bbHudY,
-    }
+    rawset(_G, "FEMBOY_BLOCKBOT_EMBED", true)
+    rawset(_G, "FEMBOY_BLOCKBOT_UI", {
+        on = bbOn, dot = bbDot, dotColor = bbDotColor,
+        grid = bbGrid, gridColor = bbGridColor, hudX = bbHudX, hudY = bbHudY,
+    })
     local ok, result = pcall(chunk)
-    _G.FEMBOY_BLOCKBOT_EMBED, _G.FEMBOY_BLOCKBOT_UI = oldEmbed, oldUi
-    if ok and type(result) == "table" then blockApi = result else print("[femboytap] blockbot load error: " .. tostring(result)) end
+    rawset(_G, "FEMBOY_BLOCKBOT_EMBED", nil)
+    rawset(_G, "FEMBOY_BLOCKBOT_UI", nil)
+    if not ok then print("[femboytap] blockbot load error: " .. tostring(result)); return end
+    blockBot = result
 end)
-if blockApi then
-    callbacks.Register("PreMove", "FemboyTap_BlockBot_PreMove", blockApi.Move)
-    callbacks.Register("CreateMove", "FemboyTap_BlockBot_CreateMove", blockApi.Move)
-    callbacks.Register("Draw", "FemboyTap_BlockBot_Draw", blockApi.Draw)
-    callbacks.Register("Unload", "FemboyTap_BlockBot_Unload", blockApi.Unload)
+if type(blockBot) == "table" then
+    callbacks.Register("PreMove", "FemboyTap_BlockBot_PreMove", blockBot.Move)
+    callbacks.Register("CreateMove", "FemboyTap_BlockBot_CreateMove", blockBot.Move)
+    callbacks.Register("Unload", "FemboyTap_BlockBot_Unload", blockBot.Unload)
 end
 
 local ncClock = (function()
@@ -1391,6 +1398,7 @@ do local p = tonumber(C.getOpt("vr_mode")); if p and p >= 1 and p <= 3 then vrMo
 
 M:OnFrame(function()
     pcall(spamSync)
+    if blockBot then pcall(blockBot.Draw) end
     pcall(HS.missTick)
     pcall(HS.sync)
     pcall(hlSync)
