@@ -856,6 +856,37 @@ end)
 
 local vtab = M:Tab("Visuals")
 
+local spotifyTab = M:Tab("Spotify")
+local spotifySub = spotifyTab:Sub("Now Playing")
+spotifySub:Row()
+spotifySub:Section("Spotify bridge")
+
+local spotifyAddon
+pcall(function()
+    local src = fetch(BASE .. "spotifyaddon.lua", ".\\femboytap_lua\\spotifyaddon.lua")
+    if type(src) ~= "string" then
+        for _, path in ipairs({ "spotifyaddon.lua", ".\\spotifyaddon.lua" }) do
+            local f = file.Open(path, "r")
+            if f then src = f:Read(); f:Close(); break end
+        end
+    end
+    if type(src) ~= "string" or #src == 0 then
+        print("[femboytap] spotify addon load error: spotifyaddon.lua was not found")
+        return
+    end
+    local chunk, err = loadstring(src, "=spotifyaddon.lua")
+    if not chunk then print("[femboytap] spotify addon compile error: " .. tostring(err)); return end
+    rawset(_G, "FEMBOY_SPOTIFY_EMBED", true)
+    local ok, result = pcall(chunk)
+    rawset(_G, "FEMBOY_SPOTIFY_EMBED", nil)
+    if not ok then print("[femboytap] spotify addon load error: " .. tostring(result)); return end
+    if type(result) ~= "table" or type(result.Draw) ~= "function" then
+        print("[femboytap] spotify addon load error: embedded API was not returned")
+        return
+    end
+    spotifyAddon = result
+end)
+
 local subsound = vtab:Sub("Sounds")
 subsound:Row()
 local hsSec = subsound:Section("Hit sound")
@@ -1432,6 +1463,7 @@ do local p = tonumber(C.getOpt("vr_mode")); if p and p >= 1 and p <= 3 then vrMo
 
 M:OnFrame(function()
     pcall(spamSync)
+    if spotifyAddon then pcall(spotifyAddon.Draw) end
     if blockBot then
         pcall(blockBot.Draw)
         if M._font then pcall(function() draw.SetFont(M._font) end) end
