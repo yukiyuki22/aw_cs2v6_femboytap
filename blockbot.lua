@@ -35,8 +35,6 @@ else
     sl_hy=row(gui.Slider(wnd,"bb_hy","HUD Y",900,0,2160,1),6)
 end
 
-local font=draw.CreateFont("Verdana",11,400)
-local font_bold=draw.CreateFont("Verdana",11,700)
 local menu=gui.Reference("MENU")
 
 local target=nil
@@ -428,9 +426,7 @@ local function BBDraw()
     local line1=lb
     local line2=nm~="" and ax.."  "..nm or ax
 
-    draw.SetFont(font_bold)
     local w1,_=draw.GetTextSize(line1)
-    draw.SetFont(font)
     local w2,_=draw.GetTextSize(line2)
     local tw=math.max(w1,w2)
     local th=11+4+11
@@ -451,11 +447,9 @@ local function BBDraw()
     draw.Color(cr,cg,cb,255)
     draw.FilledRect(dot_x,dot_y,dot_x+4,dot_y+4)
 
-    draw.SetFont(font_bold)
     draw.Color(cr,cg,cb,255)
     draw.Text(dot_x+10,dot_y-1,line1)
 
-    draw.SetFont(font)
     draw.Color(155,155,165,255)
     draw.Text(dot_x+10,dot_y+13,line2)
 
