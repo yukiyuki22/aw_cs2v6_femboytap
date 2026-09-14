@@ -989,9 +989,17 @@ local bbHudY = bbSec:Slider("HUD Y", 900, 0, 2160, 1, "%.0f")
 
 local blockBot
 pcall(function()
-    local f = file.Open("blockbot.lua", "r")
-    if not f then return end
-    local src = f:Read(); f:Close()
+    local src = fetch(BASE .. "blockbot.lua", ".\\femboytap_lua\\blockbot.lua")
+    if type(src) ~= "string" then
+        for _, path in ipairs({ "blockbot.lua", ".\\blockbot.lua" }) do
+            local f = file.Open(path, "r")
+            if f then src = f:Read(); f:Close(); break end
+        end
+    end
+    if type(src) ~= "string" or #src == 0 then
+        print("[femboytap] blockbot load error: blockbot.lua was not found locally or at " .. BASE)
+        return
+    end
     local chunk, err = loadstring(src, "=blockbot.lua")
     if not chunk then print("[femboytap] blockbot compile error: " .. tostring(err)); return end
     rawset(_G, "FEMBOY_BLOCKBOT_EMBED", true)
@@ -1003,12 +1011,19 @@ pcall(function()
     rawset(_G, "FEMBOY_BLOCKBOT_EMBED", nil)
     rawset(_G, "FEMBOY_BLOCKBOT_UI", nil)
     if not ok then print("[femboytap] blockbot load error: " .. tostring(result)); return end
+    if type(result) ~= "table" or type(result.Move) ~= "function" or type(result.Draw) ~= "function" then
+        print("[femboytap] blockbot load error: embedded API was not returned")
+        return
+    end
     blockBot = result
 end)
 if type(blockBot) == "table" then
-    callbacks.Register("PreMove", "FemboyTap_BlockBot_PreMove", blockBot.Move)
-    callbacks.Register("CreateMove", "FemboyTap_BlockBot_CreateMove", blockBot.Move)
-    callbacks.Register("Unload", "FemboyTap_BlockBot_Unload", blockBot.Unload)
+    local ok = pcall(function()
+        callbacks.Register("PreMove", "FemboyTap_BlockBot_PreMove", blockBot.Move)
+        callbacks.Register("CreateMove", "FemboyTap_BlockBot_CreateMove", blockBot.Move)
+        callbacks.Register("Unload", "FemboyTap_BlockBot_Unload", blockBot.Unload)
+    end)
+    if not ok then print("[femboytap] blockbot load error: callback registration failed") end
 end
 
 local ncClock = (function()
